@@ -1,0 +1,7 @@
+node_modules/
+data/
+.env
+*.log
+# Original-Fotos der Speisekarte (nur lokal, Inhalte stehen in src/menu-seed.json)
+*.zip
+_menu_src/

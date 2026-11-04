@@ -1,0 +1,219 @@
+{
+  "_comment": "Startwerte der Speisekarte (abgetippt von den Aushängen, Stand 11/2026). Wird nur beim ersten Start in die Datenbank übernommen, danach im Admin-Panel pflegen. Preise in Euro.",
+  "groups": {
+    "fleisch":    { "name": "Fleisch", "type": "single", "required": true,
+                    "choices": [["Kalb", 0], ["Hähnchen", 0]] },
+    "sauce":      { "name": "Sauce", "type": "multi", "required": false,
+                    "choices": [["Knoblauchsauce", 0], ["Kräutersauce", 0], ["Scharfe Sauce", 0], ["Ohne Sauce", 0]] },
+    "salat":      { "name": "Salat", "type": "multi", "required": false,
+                    "choices": [["Ohne Zwiebeln", 0], ["Ohne Tomaten", 0], ["Ohne Rotkohl", 0], ["Ohne Salat", 0]] },
+    "extras":     { "name": "Extras", "type": "multi", "required": false,
+                    "choices": [["Gebratener Gemüsemix", 1.70], ["Peperoni", 0.70], ["Jalapeños", 0.70], ["Käse", 0.70]] },
+    "beilage":    { "name": "Beilage", "type": "single", "required": true,
+                    "choices": [["Pommes", 0], ["Reis", 0]] },
+    "dip":        { "name": "Dip", "type": "single", "required": true,
+                    "choices": [["Ketchup", 0], ["Mayonnaise", 0], ["Süßsauer", 0], ["Currysauce", 0]] },
+    "schnitzel":  { "name": "Sauce", "type": "single", "required": true,
+                    "choices": [["Jägersauce", 0], ["Zigeunersauce", 0]] },
+    "pizzabelag": { "name": "Extra Belag (je 1,00 €)", "type": "multi", "required": false,
+                    "choices": [["Rindersalami", 1], ["Putenschinken", 1], ["Champignons", 1], ["Zwiebeln", 1], ["Paprika", 1], ["Peperoni", 1], ["Oliven", 1], ["Spinat", 1], ["Broccoli", 1], ["Sucuk", 1], ["Thunfisch", 1], ["Ananas", 1], ["Ei", 1], ["Knoblauch", 1], ["Extra Käse", 1]] },
+    "blechbelag": { "name": "Extra Belag (je 3,50 €)", "type": "multi", "required": false,
+                    "choices": [["Rindersalami", 3.5], ["Putenschinken", 3.5], ["Champignons", 3.5], ["Zwiebeln", 3.5], ["Paprika", 3.5], ["Peperoni", 3.5], ["Oliven", 3.5], ["Spinat", 3.5], ["Broccoli", 3.5], ["Sucuk", 3.5], ["Thunfisch", 3.5], ["Ananas", 3.5]] },
+    "softdrink":  { "name": "Sorte", "type": "single", "required": true,
+                    "choices": [["Cola", 0], ["Fanta", 0], ["Sprite", 0], ["Mezzo Mix", 0]] },
+    "suesssauer": { "name": "Sorte", "type": "single", "required": true,
+                    "choices": [["Süßsauer", 0], ["Currysauce", 0]] },
+    "ketchupmayo":{ "name": "Sorte", "type": "single", "required": true,
+                    "choices": [["Ketchup", 0], ["Salatmayonnaise", 0]] }
+  },
+  "categories": [
+    {
+      "id": "fleisch", "name": "Fleisch-Spezialitäten", "note": "Nr. 1–6 mit Salat und Sauce",
+      "items": [
+        { "num": "01",  "name": "Kalbs-/Hähnchentasche", "desc": "Kalb oder Hähnchen aus dem Drehspieß", "price": 7.80, "g": ["fleisch", "sauce", "salat", "extras"] },
+        { "num": "01a", "name": "Spezial-Kalbtasche", "desc": "Kalb oder Hähnchen aus dem Drehspieß mit gebratenem Gemüse, Käse, Salat und warmer Tomatensauce", "price": 10.00, "g": ["fleisch", "salat", "extras"] },
+        { "num": "01b", "name": "Cheezy-Tasche", "desc": "Kalb oder Hähnchen aus dem Drehspieß mit warmer Käsesauce und Salat", "price": 9.00, "g": ["fleisch", "salat", "extras"] },
+        { "num": "02",  "name": "Kindertasche aus Drehspieß", "price": 6.80, "g": ["fleisch", "sauce", "salat"] },
+        { "num": "03",  "name": "Sucuktasche", "price": 8.00, "g": ["sauce", "salat", "extras"] },
+        { "num": "04",  "name": "Dürümrolle aus Drehspieß", "price": 8.50, "g": ["fleisch", "sauce", "salat", "extras"] },
+        { "num": "05",  "name": "BIG Kalb-/Hähnchentasche", "price": 11.00, "g": ["fleisch", "sauce", "salat", "extras"] },
+        { "num": "06",  "name": "Kalb-/Hähnchenteller klein", "desc": "Aus dem Drehspieß mit Salat, Käse, Peperoni und Sauce, dazu Pommes oder Reis", "price": 12.00, "g": ["fleisch", "beilage", "sauce", "extras"] },
+        { "num": "07",  "name": "Kalb-/Hähnchenteller groß", "desc": "Aus dem Drehspieß mit Salat, Käse, Peperoni und Sauce, dazu Pommes oder Reis", "price": 14.00, "g": ["fleisch", "beilage", "sauce", "extras"] },
+        { "num": "08",  "name": "Portion Fleisch Drehspieß", "price": 13.00, "g": ["fleisch"] },
+        { "num": "08a", "name": "Portion Fleisch Drehspieß klein", "price": 8.50, "g": ["fleisch"] },
+        { "num": "09",  "name": "Pomm-Box aus Drehspieß", "price": 8.00, "g": ["fleisch", "sauce"] },
+        { "num": "10",  "name": "Iskenderteller", "desc": "Mit Kalbsfleisch aus dem Drehspieß, Brot, Joghurt, Butter und Tomatensauce", "price": 17.50 },
+        { "num": "11",  "name": "Kalbs-/Hähnchenauflauf", "desc": "Fleisch aus dem Drehspieß mit Tomatensauce, Gouda, Knoblauch, Sahne und Sauce Hollandaise", "price": 14.50, "g": ["fleisch"] },
+        { "num": "12",  "name": "Perreteller", "desc": "Mit Currywurst, Fleisch aus dem Drehspieß und Pommes, dazu Tzaziki", "price": 13.00 }
+      ]
+    },
+    {
+      "id": "cheezy", "name": "Cheezy Kebap", "note": "Neu! Preise standen nicht auf dem Aushang – bitte im Admin-Panel eintragen und freischalten.",
+      "items": [
+        { "name": "Cheezy Tasche", "price": null, "g": ["fleisch"] },
+        { "name": "Cheezy Schale", "price": null, "g": ["fleisch"] },
+        { "name": "Cheezy Lavas", "price": null, "g": ["fleisch"] },
+        { "name": "Cheezy Lahmacun", "price": null },
+        { "name": "Cheezy Pommes", "v": [["klein", null], ["groß", null]] },
+        { "name": "Cheezy Burger", "price": null },
+        { "name": "Extra Cheese Sauce", "price": null }
+      ]
+    },
+    {
+      "id": "pizza", "name": "Steinofen-Pizza", "note": "Alle Pizzen mit Tomatensauce, Goudakäse und Oregano. Extra Belag +1,00 €",
+      "items": [
+        { "num": "15", "name": "Margherita", "v": [["24 cm", 6.00], ["30 cm", 7.50]], "g": ["pizzabelag"] },
+        { "num": "16", "name": "Cipolla", "desc": "mit Zwiebeln", "v": [["24 cm", 6.50], ["30 cm", 8.00]], "g": ["pizzabelag"] },
+        { "num": "17", "name": "Salami", "desc": "Rindersalami", "v": [["24 cm", 7.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "18", "name": "Schinken", "desc": "Putenschinken mit 8 % Gewürzlake", "v": [["24 cm", 7.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "19", "name": "Funghi", "desc": "mit frischen Champignons", "v": [["24 cm", 7.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "20", "name": "Spinat", "v": [["24 cm", 7.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "21", "name": "Bolognese", "desc": "mit Hackfleisch", "v": [["24 cm", 7.50], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "22", "name": "Thunfisch", "v": [["24 cm", 8.00], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "23", "name": "Hawaii", "desc": "mit Putenschinken (8 % Gewürzlake) und Ananas", "v": [["24 cm", 8.00], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "24", "name": "Spezial", "desc": "mit Fleisch aus dem Drehspieß und Zwiebeln", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "25", "name": "Spezial 2", "desc": "mit Hähnchen aus dem Drehspieß, Zwiebeln, Paprika und Broccoli", "v": [["24 cm", 9.00], ["30 cm", 11.50]], "g": ["pizzabelag"] },
+        { "num": "26", "name": "Nesli", "desc": "mit Rindersalami, Putenschinken (8 % Gewürzlake) und Champignons", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "27", "name": "Parma", "desc": "mit Putenschinken (8 % Gewürzlake) und Broccoli", "v": [["24 cm", 7.50], ["30 cm", 9.50]], "g": ["pizzabelag"] },
+        { "num": "28", "name": "Gamberetti", "desc": "mit Krabben und Knoblauch", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "29", "name": "Frutti di Mare", "desc": "mit Krabben, Muscheln, Tintenfisch und Knoblauch", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "30", "name": "Broccoli", "v": [["24 cm", 7.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "31", "name": "Sucuk", "desc": "türkische Knoblauchwurst", "v": [["24 cm", 8.00], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "32", "name": "Mozzarella", "desc": "mit frischen Tomaten", "v": [["24 cm", 8.00], ["30 cm", 9.50]], "g": ["pizzabelag"] },
+        { "num": "33", "name": "Calzone mit 3 Belägen", "desc": "Belag nach Wahl – bitte im Kommentar angeben", "v": [["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "34", "name": "Vegetarische Pizza", "desc": "mit Zwiebeln, Paprika, Broccoli und Champignons", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "35", "name": "Diavola", "desc": "mit scharfen Peperoni, Paprika, Rindersalami und Knoblauch", "v": [["24 cm", 8.00], ["30 cm", 9.00]], "g": ["pizzabelag"] },
+        { "num": "36", "name": "Gepetto", "desc": "mit Thunfisch, Paprika und Zwiebeln", "v": [["24 cm", 8.50], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "37", "name": "Quattro Formaggi", "desc": "4 Käsesorten", "v": [["24 cm", 8.00], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "38", "name": "Hollandaise", "desc": "mit Fleisch aus dem Drehspieß, Oliven und Champignons", "v": [["24 cm", 9.00], ["30 cm", 11.00]], "g": ["pizzabelag"] },
+        { "num": "39", "name": "Toscana", "desc": "mit Putenschinken (8 % Gewürzlake) und Champignons", "v": [["24 cm", 7.50], ["30 cm", 9.50]], "g": ["pizzabelag"] },
+        { "num": "40", "name": "Italia", "desc": "mit Spinat, Putenschinken und Ei", "v": [["24 cm", 9.00], ["30 cm", 10.50]], "g": ["pizzabelag"] },
+        { "num": "41", "name": "Eliza", "desc": "mit Sucuk, Peperoni, Oliven und Paprika", "v": [["24 cm", 9.50], ["30 cm", 11.50]], "g": ["pizzabelag"] },
+        { "num": "42", "name": "Adar", "desc": "mit Thunfisch, Zwiebeln, Peperoni, Pilzen, Broccoli und Knoblauch", "v": [["24 cm", 9.50], ["30 cm", 11.50]], "g": ["pizzabelag"] },
+        { "num": "43", "name": "Quattro Stagioni", "desc": "mit Artischocken, Salami, Schinken und Pilzen", "v": [["24 cm", 7.50], ["30 cm", 10.00]], "g": ["pizzabelag"] },
+        { "num": "FB", "name": "Familienblechpizza (40 × 60 cm)", "v": [["Margherita", 20.00], ["mit einem Belag", 25.00]], "g": ["blechbelag"] }
+      ]
+    },
+    {
+      "id": "pizzabroetchen", "name": "Gefüllte Pizzabrötchen", "note": "Alle Pizzabrötchen von 50–59 beinhalten Goudakäse",
+      "items": [
+        { "num": "50", "name": "Pizzabrötchen mit Gouda", "price": 6.00 },
+        { "num": "51", "name": "Pizzabrötchen mit Rindersalami", "price": 7.00 },
+        { "num": "52", "name": "Pizzabrötchen mit Putenschinken", "desc": "Putenschinken mit 8 % Gewürzlake", "price": 7.00 },
+        { "num": "53", "name": "Pizzabrötchen mit Putenschinken und Ananas", "desc": "Putenschinken mit 8 % Gewürzlake", "price": 7.50 },
+        { "num": "54", "name": "Pizzabrötchen mit Thunfisch", "price": 7.50 },
+        { "num": "55", "name": "Pizzabrötchen mit Spinat und Weichkäse", "price": 7.00 },
+        { "num": "56", "name": "Pizzabrötchen mit Sucuk und Weichkäse", "price": 7.50 },
+        { "num": "57", "name": "Pizzabrötchen mit Hähnchen aus Drehspieß", "price": 8.00 },
+        { "num": "58", "name": "Pizzabrötchen mit Bolognese", "price": 8.00 },
+        { "num": "59", "name": "Pizzabrötchen mit Fleisch aus Drehspieß", "desc": "mit Weichkäse und Peperoni", "price": 8.50 },
+        { "num": "60", "name": "Pizzabrötchen mit Kräutercreme", "price": 4.00 }
+      ]
+    },
+    {
+      "id": "lahmacun", "name": "Lahmacun", "note": "Hausgemacht",
+      "items": [
+        { "num": "65", "name": "Türkische Pizza ohne alles", "price": 4.50 },
+        { "num": "66", "name": "Türkische Pizza Salat", "desc": "mit Salat und Sauce", "price": 7.80, "g": ["sauce", "salat"] },
+        { "num": "67", "name": "Türkische Pizza mit Fleisch", "desc": "mit Fleisch aus dem Drehspieß, Salat und Sauce", "price": 10.00, "g": ["fleisch", "sauce", "salat"] },
+        { "num": "68", "name": "Türkische Pizza Sucuk", "desc": "mit Salat und Sauce", "price": 10.00, "g": ["sauce", "salat"] },
+        { "num": "69", "name": "Türkische Pizza Falafel", "desc": "mit Salat und Sauce", "price": 10.00, "g": ["sauce", "salat"] }
+      ]
+    },
+    {
+      "id": "pide", "name": "Teiggerichte & Pide", "note": "Alle Teiggerichte werden frisch zubereitet",
+      "items": [
+        { "num": "80", "name": "Pide mit Weißkäse und Gouda", "price": 7.50 },
+        { "num": "81", "name": "Pide mit Spinat und Weißkäse", "price": 8.50 },
+        { "num": "82", "name": "Pide mit Gehacktem und Gouda", "price": 9.50 },
+        { "num": "83", "name": "Pide mit Gouda und Fleisch aus Drehspieß", "price": 9.50 },
+        { "num": "84", "name": "Pide mit Sucuk, Ei und Gouda", "price": 10.50 },
+        { "num": "85", "name": "Pide vegetarisch", "price": 9.50 }
+      ]
+    },
+    {
+      "id": "vegetarisch", "name": "Vegetarisch",
+      "items": [
+        { "num": "90",  "name": "Falafeltasche", "desc": "mit Salat und Sauce", "price": 7.80, "g": ["sauce", "salat"] },
+        { "num": "91",  "name": "Falafeldürüm", "desc": "mit Salat und Sauce", "price": 8.50, "g": ["sauce", "salat"] },
+        { "num": "92",  "name": "Falafelteller", "desc": "Pommes oder Reis, Salat, Käse, Peperoni und Sauce", "price": 14.00, "g": ["beilage", "sauce"] },
+        { "num": "92a", "name": "Falafel (Stück)", "price": 2.00 },
+        { "num": "93",  "name": "Käserolle (5 Stück)", "price": 7.00 },
+        { "num": "93b", "name": "Käserolle (1 Stück)", "price": 1.60 },
+        { "num": "94",  "name": "Salattasche", "desc": "mit Salat, Käse, Peperoni und Sauce", "price": 5.50, "g": ["sauce", "salat"] },
+        { "num": "95",  "name": "Salat-Dürüm", "desc": "mit Salat, Käse, Peperoni und Sauce", "price": 6.50, "g": ["sauce", "salat"] },
+        { "num": "96",  "name": "Weinblätter", "v": [["5 Stück", 7.00], ["1 Stück", 1.60]] },
+        { "num": "97",  "name": "Gebratene Gemüsetasche", "desc": "Salat, Käse, Peperoni und Sauce", "price": 8.00, "g": ["sauce", "salat"] },
+        { "num": "98",  "name": "Gebratener Gemüseteller", "desc": "mit Pommes oder Reis, Salat, Käse, Peperoni und Sauce", "v": [["klein", 11.50], ["groß", 13.00]], "g": ["beilage", "sauce"] }
+      ]
+    },
+    {
+      "id": "salat", "name": "Salatteller", "note": "Alle Salate mit Käse und Peperoni",
+      "items": [
+        { "num": "101",  "name": "Gemischter Salat", "desc": "mit Weißkäse und Salat", "v": [["klein", 6.00], ["groß", 7.80]] },
+        { "num": "102",  "name": "Thunfischsalat", "desc": "gemischter Salat mit Thunfisch", "v": [["klein", 7.00], ["groß", 9.00]] },
+        { "num": "102a", "name": "Vorspeisenteller", "desc": "mit 2 Falafel, 2 Teigröllchen, 2 gefüllten Weinblättern, gebratenem Gemüse mit spezieller Tomatensauce, 4 Dips und Salat", "price": 12.50 },
+        { "num": "102b", "name": "Krautsalat", "v": [["klein", 5.00], ["groß", 7.50]] },
+        { "num": "103",  "name": "Mozzarella-Salat", "desc": "gemischter Salat mit Tomaten", "v": [["klein", 7.00], ["groß", 9.00]] },
+        { "num": "104",  "name": "Drehspieß-Salat", "desc": "Kalb- oder Hähnchenfleisch und gemischter Salat", "v": [["klein", 8.50], ["groß", 11.50]], "g": ["fleisch"] },
+        { "num": "105",  "name": "Hawaii-Salat", "desc": "mit gemischtem Salat, Putenschinken und Ananas", "v": [["klein", 8.50], ["groß", 11.50]] },
+        { "num": "106",  "name": "Pollo Funghi", "desc": "mit gemischtem Salat, Hähnchenfleisch aus dem Drehspieß und gebratenen Champignons", "v": [["klein", 9.00], ["groß", 11.50]] }
+      ]
+    },
+    {
+      "id": "imbiss", "name": "Imbissgerichte",
+      "items": [
+        { "num": "110", "name": "Pommes Frites", "v": [["klein", 3.80], ["mittel", 4.80], ["groß", 5.80]] },
+        { "num": "111", "name": "Pommes Spezial", "price": 7.00 },
+        { "num": "112", "name": "Currywurst mit Pommes", "price": 7.50 },
+        { "num": "113", "name": "Currywurst", "price": 4.50 },
+        { "num": "114", "name": "Chicken Nuggets (6 Stück)", "price": 5.50 },
+        { "num": "115", "name": "Chicken Nuggets (10 Stück)", "price": 8.00 },
+        { "num": "116", "name": "Chicken Nuggets mit Pommes (6 Stück)", "desc": "mit 1 Dip nach Wahl", "price": 8.00, "g": ["dip"] },
+        { "num": "117", "name": "Chicken Wings mit Pommes (6 Stück)", "price": 9.00 },
+        { "num": "118", "name": "Jäger-/Zigeunerschnitzel", "desc": "mit Pommes und Salat", "price": 12.00, "g": ["schnitzel"] },
+        { "num": "119", "name": "Schnitzel Wiener Art", "desc": "mit Pommes", "price": 10.00 },
+        { "num": "120", "name": "Hawaii-Schnitzel", "desc": "mit Putenschinken (8 % Gewürzlake), Ananas und Gouda überbacken", "price": 13.00 }
+      ]
+    },
+    {
+      "id": "grill", "name": "Grillgerichte", "note": "Mit Pommes oder Reis, dazu Salat",
+      "items": [
+        { "num": "145", "name": "Hähnchenspieß", "price": 17.00, "g": ["beilage"] },
+        { "num": "146", "name": "Türkische Frikadelle", "price": 17.00, "g": ["beilage"] }
+      ]
+    },
+    {
+      "id": "beilagen", "name": "Saucen & Beilagen",
+      "items": [
+        { "num": "130", "name": "Süßsauer / Currysauce", "price": 1.00, "g": ["suesssauer"] },
+        { "num": "131", "name": "Ketchup / Salatmayonnaise", "price": 0.70, "g": ["ketchupmayo"] },
+        { "num": "132", "name": "Jäger-/Zigeunersauce", "price": 2.00, "g": ["schnitzel"] },
+        { "num": "133", "name": "Tzaziki", "price": 4.50 },
+        { "num": "134", "name": "Reis", "price": 5.50 }
+      ]
+    },
+    {
+      "id": "dessert", "name": "Dessert",
+      "items": [
+        { "num": "150", "name": "Baklava", "v": [["1 Stück", 1.70], ["Portion (5 Stück)", 7.00]] }
+      ]
+    },
+    {
+      "id": "getraenke", "name": "Getränke", "note": "zzgl. Pfand",
+      "items": [
+        { "name": "Cola, Fanta, Sprite, Mezzo Mix", "v": [["Flasche 0,33 l", 3.00], ["Dose 0,33 l", 2.25]], "g": ["softdrink"] },
+        { "name": "Fuze Tea 0,33 l", "price": 2.50 },
+        { "name": "Durstlöscher 0,5 l", "price": 2.00 },
+        { "name": "Apfelschorle 0,5 l", "price": 2.50 },
+        { "name": "Capri-Sun", "price": 1.50 },
+        { "name": "Red Bull 0,25 l", "price": 3.00 },
+        { "name": "Ayran 0,25 l", "price": 2.00 },
+        { "name": "Kaffee", "price": 2.00 },
+        { "name": "Tee", "price": 2.00 },
+        { "name": "Wasser 0,5 l", "price": 2.00 },
+        { "name": "Bier 0,3 l", "price": 2.50, "active": false }
+      ]
+    }
+  ]
+}
