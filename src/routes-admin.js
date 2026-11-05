@@ -17,6 +17,15 @@ export const adminRouter = express.Router();
 
 const clip = (s, n) => (s === undefined || s === null ? null : String(s).trim().slice(0, n) || null);
 const isLoopback = (ip) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
+// Hinter einem Reverse-Proxy ist die Socket-Adresse immer der Proxy (oft localhost) – dann zählt die weitergereichte Adresse.
+const clientAddress = (req) => (config.trustProxy ? req.ip : req.socket.remoteAddress);
+
+function readPaypalMe(value) {
+  if (!value) return null;
+  const handle = cleanPaypalMe(value);
+  if (!handle) throw new UserError('PayPal.me-Name ungültig – bitte nur den Namen hinter paypal.me/ angeben, z. B. „maxmuster“.');
+  return handle;
+}
 const userCount = () => db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 
 function isoOrNull(v, label) {
@@ -32,7 +41,7 @@ adminRouter.get('/api/auth/me', (req, res) => {
   res.json({
     user: req.user ?? null,
     needsSetup,
-    setupAllowed: needsSetup && isLoopback(req.socket.remoteAddress),
+    setupAllowed: needsSetup && isLoopback(clientAddress(req)),
   });
 });
 
@@ -40,12 +49,12 @@ adminRouter.get('/api/auth/me', (req, res) => {
 adminRouter.post('/api/auth/setup', (req, res, next) => {
   try {
     if (userCount() > 0) throw new UserError('Es gibt bereits Zugänge.', 409);
-    if (!isLoopback(req.socket.remoteAddress)) throw new UserError('Der erste Zugang kann nur direkt am Server angelegt werden (localhost).', 403);
-    const { username, displayName, password } = req.body || {};
+    if (!isLoopback(clientAddress(req))) throw new UserError('Der erste Zugang kann nur direkt am Server angelegt werden (localhost).', 403);
+    const { username, displayName, password, paypalMe } = req.body || {};
     validateUsername(username);
     const pwErr = validatePassword(password);
     if (pwErr) throw new UserError(pwErr);
-    const id = createUser({ username, displayName: displayName || username, password });
+    const id = createUser({ username, displayName: clip(displayName, 60) || username, password, paypalMe: readPaypalMe(paypalMe) });
     audit(id, 'user.setup', { detail: username });
     startSession(res, id);
     res.json({ ok: true });
@@ -85,11 +94,7 @@ adminRouter.patch('/api/admin/me', (req, res, next) => {
       if (!name) throw new UserError('Anzeigename darf nicht leer sein.');
       db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, req.user.id);
     }
-    if (paypalMe !== undefined) {
-      const handle = paypalMe ? cleanPaypalMe(paypalMe) : '';
-      if (paypalMe && !handle) throw new UserError('PayPal.me-Name ungültig (nur der Name, z. B. „maxmuster“).');
-      db.prepare('UPDATE users SET paypal_me = ? WHERE id = ?').run(handle || null, req.user.id);
-    }
+    if (paypalMe !== undefined) db.prepare('UPDATE users SET paypal_me = ? WHERE id = ?').run(readPaypalMe(paypalMe), req.user.id);
     if (newPassword !== undefined) {
       const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
       if (!verifyPassword(String(currentPassword || ''), row.password_hash)) throw new UserError('Das aktuelle Passwort stimmt nicht.');
@@ -127,7 +132,7 @@ adminRouter.post('/api/admin/users', (req, res, next) => {
     const pwErr = validatePassword(password);
     if (pwErr) throw new UserError(pwErr);
     if (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username.trim())) throw new UserError('Diesen Benutzernamen gibt es schon.', 409);
-    const id = createUser({ username, displayName: clip(displayName, 60) || username, password, paypalMe: cleanPaypalMe(paypalMe) });
+    const id = createUser({ username, displayName: clip(displayName, 60) || username, password, paypalMe: readPaypalMe(paypalMe) });
     audit(req.user.id, 'user.create', { detail: username });
     res.status(201).json({ user: userRow(id) });
   } catch (err) {
@@ -146,7 +151,7 @@ adminRouter.patch('/api/admin/users/:id', (req, res, next) => {
       if (!name) throw new UserError('Anzeigename darf nicht leer sein.');
       db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(name, id);
     }
-    if (paypalMe !== undefined) db.prepare('UPDATE users SET paypal_me = ? WHERE id = ?').run(cleanPaypalMe(paypalMe) || null, id);
+    if (paypalMe !== undefined) db.prepare('UPDATE users SET paypal_me = ? WHERE id = ?').run(readPaypalMe(paypalMe), id);
     if (active !== undefined) {
       if (id === req.user.id && !active) throw new UserError('Du kannst dich nicht selbst deaktivieren.');
       db.prepare('UPDATE users SET active = ? WHERE id = ?').run(active ? 1 : 0, id);
@@ -184,11 +189,7 @@ adminRouter.put('/api/admin/settings', (req, res, next) => {
       if (!['auto', 'api', 'paypalme'].includes(paypalMode)) throw new UserError('Unbekannter Zahlungsmodus.');
       setSetting('paypal_mode', paypalMode);
     }
-    if (defaultPaypalMe !== undefined) {
-      const h = defaultPaypalMe ? cleanPaypalMe(defaultPaypalMe) : '';
-      if (defaultPaypalMe && !h) throw new UserError('PayPal.me-Name ungültig.');
-      setSetting('default_paypal_me', h);
-    }
+    if (defaultPaypalMe !== undefined) setSetting('default_paypal_me', readPaypalMe(defaultPaypalMe) ?? '');
     if (tipPresets !== undefined) {
       const list = String(tipPresets).split(/[;,\s]+/).map((x) => Number(x.replace(',', '.'))).filter((n) => n > 0 && n <= 50);
       setSetting('tip_presets', list.slice(0, 5).join(',') || '0.5,1,2');
@@ -215,7 +216,7 @@ const ROUND_SELECT = `
 function serializeRound(r) {
   return {
     id: r.id, title: r.title, status: r.status, accessCode: r.access_code, deadline: r.deadline, pickupTime: r.pickup_time,
-    paypalMe: r.paypal_me, collectorId: r.collector_id, collector: r.collector_name, openedBy: r.opened_by_name,
+    paypalMe: r.collector_paypal_me, collectorId: r.collector_id, collector: r.collector_name, openedBy: r.opened_by_name,
     openedAt: r.opened_at, closedBy: r.closed_by_name, closedAt: r.closed_at, notes: r.notes,
     orderCount: r.order_count, sumTotal: r.sum_total, sumPaid: r.sum_paid,
   };
@@ -256,11 +257,6 @@ function readRoundFields(body) {
   if (body.pickupTime !== undefined) out.pickup_time = clip(body.pickupTime, 40);
   if (body.accessCode !== undefined) out.access_code = clip(body.accessCode, 32);
   if (body.notes !== undefined) out.notes = clip(body.notes, 4000);
-  if (body.paypalMe !== undefined) {
-    const h = body.paypalMe ? cleanPaypalMe(body.paypalMe) : '';
-    if (body.paypalMe && !h) throw new UserError('PayPal.me-Name ungültig.');
-    out.paypal_me = h || null;
-  }
   if (body.collectorId !== undefined) {
     const cid = body.collectorId ? Number(body.collectorId) : null;
     if (cid && !db.prepare('SELECT 1 FROM users WHERE id = ?').get(cid)) throw new UserError('Unbekannter Kassenwart.');
@@ -276,12 +272,9 @@ adminRouter.post('/api/admin/rounds', (req, res, next) => {
       if (getOpenRound()) throw new UserError('Es ist schon eine Bestellrunde offen. Bitte die erst schließen.', 409);
       const f = readRoundFields({ ...body, title: body.title || `Dönerrunde ${new Date().toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' })}` });
       if (f.deadline && Date.parse(f.deadline) <= Date.now()) throw new UserError('Der Bestellschluss liegt in der Vergangenheit.');
-      const collectorId = f.collector_id ?? req.user.id;
-      const collectorHandle = db.prepare('SELECT paypal_me FROM users WHERE id = ?').get(collectorId)?.paypal_me;
-      const paypalMe = f.paypal_me !== undefined && f.paypal_me !== null ? f.paypal_me : collectorHandle || null;
-      const info = db.prepare(`INSERT INTO rounds (title, status, access_code, deadline, pickup_time, paypal_me, collector_id, opened_by, opened_at, notes)
-                               VALUES (?, 'open', ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(f.title, f.access_code ?? null, f.deadline ?? null, f.pickup_time ?? null, paypalMe, collectorId, req.user.id, now(), f.notes ?? null);
+      const info = db.prepare(`INSERT INTO rounds (title, status, access_code, deadline, pickup_time, collector_id, opened_by, opened_at, notes)
+                               VALUES (?, 'open', ?, ?, ?, ?, ?, ?, ?)`)
+        .run(f.title, f.access_code ?? null, f.deadline ?? null, f.pickup_time ?? null, f.collector_id ?? req.user.id, req.user.id, now(), f.notes ?? null);
       return Number(info.lastInsertRowid);
     });
     audit(req.user.id, 'round.open', { roundId: id });
@@ -405,8 +398,13 @@ adminRouter.patch('/api/admin/orders/:id', (req, res, next) => {
         : { lines: JSON.parse(order.lines), subtotal: order.subtotal };
       const t = parseTip(body.tip !== undefined ? body.tip : order.tip, body.tipRecipient !== undefined ? body.tipRecipient : order.tip_recipient);
       Object.assign(f, { lines: JSON.stringify(priced.lines), subtotal: priced.subtotal, tip: t.tip, tip_recipient: t.tipRecipient, total: priced.subtotal + t.tip });
-      if (f.total !== order.total) changes.push(`Betrag ${(order.total / 100).toFixed(2)} → ${(f.total / 100).toFixed(2)} €`);
-      else changes.push('Positionen geändert');
+      if (f.total !== order.total) {
+        changes.push(`Betrag ${(order.total / 100).toFixed(2)} → ${(f.total / 100).toFixed(2)} €`);
+        // Ein schon angelegter PayPal-Vorgang lautet noch auf den alten Betrag – beim nächsten Bezahlen neu anlegen.
+        if (order.payment_status === 'open') f.paypal_order_id = null;
+      } else {
+        changes.push('Positionen geändert');
+      }
     }
     const keys = Object.keys(f);
     if (keys.length) {
@@ -502,6 +500,21 @@ adminRouter.delete('/api/admin/menu/items/:id', (req, res) => {
   db.prepare('DELETE FROM menu_items WHERE id = ?').run(Number(req.params.id));
   audit(req.user.id, 'menu.delete', { detail: item.name });
   res.json({ menu: loadMenu({ includeInactive: true }) });
+});
+
+adminRouter.put('/api/admin/menu/categories/:id', (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    if (!db.prepare('SELECT 1 FROM categories WHERE id = ?').get(id)) throw new UserError('Kategorie nicht gefunden.', 404);
+    const { name, note, prefix } = req.body || {};
+    if (!clip(name, 60)) throw new UserError('Name fehlt.');
+    db.prepare('UPDATE categories SET name = ?, note = ?, item_prefix = ? WHERE id = ?')
+      .run(clip(name, 60), clip(note, 200), clip(prefix, 30), id);
+    audit(req.user.id, 'menu.category', { detail: id });
+    res.json({ menu: loadMenu({ includeInactive: true }) });
+  } catch (err) {
+    next(err);
+  }
 });
 
 adminRouter.put('/api/admin/menu/groups/:id', (req, res, next) => {

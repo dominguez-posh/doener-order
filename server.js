@@ -43,7 +43,8 @@ app.use('/api', (_req, res) => res.status(404).json({ error: 'Nicht gefunden.' }
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   if (err instanceof UserError) return res.status(err.status).json({ error: err.message });
-  if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Ungültige Anfrage.' });
+  // Fehler aus dem JSON-Parser (kaputtes JSON, zu groß) sind Client-Fehler, kein Serverproblem
+  if (err.expose && err.status >= 400 && err.status < 500) return res.status(err.status).json({ error: 'Ungültige Anfrage.' });
   if (err.paypal) return res.status(502).json({ error: 'PayPal hat die Anfrage abgelehnt. Bitte später nochmal versuchen.' });
   console.error(err);
   res.status(500).json({ error: 'Interner Fehler.' });

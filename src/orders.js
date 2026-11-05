@@ -9,15 +9,22 @@ export class UserError extends Error {
 }
 
 // ---- Speisekarte ----
+// Name außerhalb der Karte (Warenkorb, Bestellliste, Ausdruck): „Schinken“ allein sagt nicht, dass es eine Pizza ist.
+export function displayName(name, prefix) {
+  return prefix && !name.toLowerCase().includes(prefix.toLowerCase()) ? `${prefix} ${name}` : name;
+}
+
 export function loadMenu({ includeInactive = false } = {}) {
-  const categories = db.prepare('SELECT id, name, note FROM categories ORDER BY sort, name').all();
+  const categories = db.prepare('SELECT id, name, note, item_prefix AS prefix FROM categories ORDER BY sort, name').all();
+  const prefixOf = new Map(categories.map((c) => [c.id, c.prefix]));
   const groups = {};
   for (const g of db.prepare('SELECT * FROM option_groups').all()) {
     groups[g.id] = { id: g.id, name: g.name, type: g.type, required: Boolean(g.required), choices: JSON.parse(g.choices) };
   }
   const items = db.prepare(`SELECT * FROM menu_items ${includeInactive ? '' : 'WHERE active = 1'} ORDER BY sort, id`).all()
     .map((i) => ({
-      id: i.id, categoryId: i.category_id, num: i.num, name: i.name, description: i.description,
+      id: i.id, categoryId: i.category_id, num: i.num, name: i.name,
+      displayName: displayName(i.name, prefixOf.get(i.category_id)), description: i.description,
       variants: JSON.parse(i.variants), groups: JSON.parse(i.groups), active: Boolean(i.active),
     }));
   return { categories, groups, items };
@@ -76,7 +83,7 @@ export function priceLines(rawLines, { allowCustom = false, allowInactive = fals
       }
     }
     return {
-      custom: false, itemId: item.id, num: item.num, name: item.name, variant: variant.label,
+      custom: false, itemId: item.id, num: item.num, name: item.displayName, variant: variant.label,
       // Rohe Auswahl mitspeichern, damit das Admin-Panel die Position wieder bearbeiten kann.
       selection: { variant: vIndex, options: Object.fromEntries(item.groups.map((g) => [g, chosen[g] ?? []])) },
       options, unitPrice, qty, lineTotal: unitPrice * qty, comment,

@@ -27,10 +27,11 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 CREATE TABLE IF NOT EXISTS categories (
-  id   TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  note TEXT,
-  sort INTEGER NOT NULL DEFAULT 0
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  note        TEXT,
+  item_prefix TEXT,                 -- steht in Bestellungen vor dem Artikelnamen ("Pizza Schinken")
+  sort        INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS option_groups (
   id       TEXT PRIMARY KEY,
@@ -57,8 +58,7 @@ CREATE TABLE IF NOT EXISTS rounds (
   access_code  TEXT,
   deadline     TEXT,
   pickup_time  TEXT,
-  paypal_me    TEXT,
-  collector_id INTEGER REFERENCES users(id),
+  collector_id INTEGER REFERENCES users(id),   -- Kasse; das PayPal-Konto kommt vom Zugang dieser Person
   opened_by    INTEGER REFERENCES users(id),
   opened_at    TEXT NOT NULL,
   closed_by    INTEGER REFERENCES users(id),
@@ -101,7 +101,13 @@ CREATE TABLE IF NOT EXISTS audit (
 CREATE INDEX IF NOT EXISTS audit_round ON audit(round_id);
 `);
 
-export const now = () => new Date().toISOString();
+// ---- Migrationen für Datenbanken, die mit einer älteren Version angelegt wurden ----
+const hasColumn = (table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === column);
+if (!hasColumn('categories', 'item_prefix')) {
+  db.exec("ALTER TABLE categories ADD COLUMN item_prefix TEXT; UPDATE categories SET item_prefix = 'Pizza' WHERE id = 'pizza';");
+}
+
+export const now =() => new Date().toISOString();
 export const cents = (euro) => (euro === null || euro === undefined ? null : Math.round(euro * 100));
 
 export function tx(fn) {
@@ -151,11 +157,11 @@ function seedMenu() {
       const choices = g.choices.map(([label, price]) => ({ label, price: cents(price) }));
       insGroup.run(id, g.name, g.type, g.required ? 1 : 0, JSON.stringify(choices));
     }
-    const insCat = db.prepare('INSERT INTO categories (id, name, note, sort) VALUES (?, ?, ?, ?)');
+    const insCat = db.prepare('INSERT INTO categories (id, name, note, item_prefix, sort) VALUES (?, ?, ?, ?, ?)');
     const insItem = db.prepare(`INSERT INTO menu_items (category_id, num, name, description, variants, groups, active, sort)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
     seed.categories.forEach((cat, ci) => {
-      insCat.run(cat.id, cat.name, cat.note ?? null, ci);
+      insCat.run(cat.id, cat.name, cat.note ?? null, cat.prefix ?? null, ci);
       cat.items.forEach((item, ii) => {
         const variants = item.v
           ? item.v.map(([label, price]) => ({ label, price: cents(price) }))

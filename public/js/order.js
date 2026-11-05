@@ -3,6 +3,7 @@ import { api, esc, money, clock, $, toast, storage, priceFrom, openItemDialog, d
 let state = null;          // Antwort von /api/public/state
 let cart = [];             // [{ itemId, variant, options, qty, comment }]
 let query = '';
+let lastJson = '';         // letzte Server-Antwort, um unnötiges Neuzeichnen zu vermeiden
 
 const CART_KEY = 'doener.cart';
 const NAME_KEY = 'doener.name';
@@ -13,8 +14,12 @@ const isOpen = () => Boolean(state?.round?.isOpen);
 
 async function load() {
   try {
+    const next = await api('/api/public/state');
+    const json = JSON.stringify(next);
+    if (json === lastJson) return;
+    lastJson = json;
     const prevRound = state?.round?.id;
-    state = await api('/api/public/state');
+    state = next;
     document.title = `Bestellen · ${state.shopName}`;
     $('[data-shop]').textContent = state.shopName;
     const saved = storage.get(CART_KEY, null);
@@ -29,6 +34,7 @@ async function load() {
     renderCart();
     renderMyOrders();
   } catch (err) {
+    lastJson = '';
     $('[data-round-box]').innerHTML = `<strong>Server nicht erreichbar</strong><span class="small">${esc(err.message)}</span>`;
   }
 }
@@ -69,7 +75,7 @@ function matches(item) {
   if (!query) return true;
   const q = query.toLowerCase();
   return (item.num && item.num.toLowerCase().replace(/^0+/, '') === q.replace(/^0+/, ''))
-    || `${item.num ?? ''} ${item.name} ${item.description ?? ''}`.toLowerCase().includes(q);
+    || `${item.num ?? ''} ${item.displayName} ${item.description ?? ''}`.toLowerCase().includes(q);
 }
 
 function renderMenu() {
@@ -153,7 +159,7 @@ async function addItem(itemId) {
   cart.push(sel);
   saveCart();
   renderCart();
-  toast(`${sel.qty}× ${item.name} im Warenkorb`);
+  toast(`${sel.qty}× ${item.displayName} im Warenkorb`);
 }
 
 async function editLine(idx) {

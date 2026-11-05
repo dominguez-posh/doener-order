@@ -111,7 +111,9 @@ export function renderPrint({ round, orders, totals, aggregate }, settings, view
 
 export function renderCsv({ round, orders }) {
   const cell = (v) => {
-    const s = String(v ?? '');
+    let s = String(v ?? '');
+    // Excel wertet Zellen aus, die mit = + - @ beginnen. Namen und Kommentare kommen von der öffentlichen Bestellseite.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const eur = (c) => (c / 100).toFixed(2).replace('.', ',');

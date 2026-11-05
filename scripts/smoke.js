@@ -59,7 +59,7 @@ try {
     let r = await call('GET', '/api/auth/me');
     assert.equal(r.data.needsSetup, true);
     assert.equal(r.data.setupAllowed, true);
-    r = await call('POST', '/api/auth/setup', { username: 'azubi1', displayName: 'Azubi Eins', password: 'geheim123' });
+    r = await call('POST', '/api/auth/setup', { username: 'azubi1', displayName: 'Azubi Eins', password: 'geheim123', paypalMe: 'paypal.me/azubikasse' });
     assert.equal(r.status, 200);
     r = await call('POST', '/api/auth/setup', { username: 'x', displayName: 'x', password: 'geheim123' }, { auth: false });
     assert.equal(r.status, 409);
@@ -97,7 +97,6 @@ try {
   });
 
   await step('Azubi öffnet Runde mit Bestell-Code und PayPal.me', async () => {
-    await call('PATCH', '/api/admin/me', { paypalMe: 'https://paypal.me/azubikasse' });
     const r = await call('POST', '/api/admin/rounds', { title: 'Smoke-Runde', accessCode: 'Döner42', pickupTime: '12:15 Uhr' });
     assert.equal(r.status, 201, JSON.stringify(r.data));
     roundId = r.data.round.id;
@@ -129,6 +128,8 @@ try {
     // 2 × (7,80 + 0,70 Käse) + Pizza 30 cm 7,50 = 24,50, + 1,20 Trinkgeld
     assert.equal(o.subtotal, 2450);
     assert.equal(o.total, 2570);
+    assert.equal(o.lines[0].name, 'Kalbs-/Hähnchentasche');
+    assert.equal(o.lines[1].name, 'Pizza Margherita', 'Kategorie-Vorsatz steht in der Bestellung');
     assert.equal(r.data.approveUrl, null);
     assert.equal(o.pay.paypalMeLink, 'https://paypal.me/azubikasse/25.70EUR');
     orderToken = o.token;
@@ -192,6 +193,7 @@ try {
   });
 
   await step('Druck-Export und CSV', async () => {
+    await call('POST', `/api/admin/rounds/${roundId}/orders`, { name: '=HYPERLINK("x")', lines: [{ itemId: pizza().id, variant: 0, qty: 1 }] });
     let res = await call('GET', `/admin/runden/${roundId}/druck`, undefined, { raw: true });
     const html = await res.text();
     assert.equal(res.status, 200);
@@ -204,6 +206,8 @@ try {
     assert.match(res.headers.get('content-disposition'), /attachment/);
     assert.match(csv, /Nachzügler/);
     assert.match(csv, /Extra Tzaziki/);
+    assert.match(csv, /Pizza Margherita/);
+    assert.match(csv, /"'=HYPERLINK\(""x""\)"/, 'Formeln werden für Excel entschärft');
   });
 
   await step('Bestellschluss schließt die Runde automatisch', async () => {
@@ -219,8 +223,11 @@ try {
   await step('Zugänge anlegen, Speisekarte pflegen', async () => {
     let r = await call('POST', '/api/admin/users', { username: 'azubi2', displayName: 'Azubi Zwei', password: 'kurz' });
     assert.equal(r.status, 400);
-    r = await call('POST', '/api/admin/users', { username: 'azubi2', displayName: 'Azubi Zwei', password: 'auch-geheim' });
+    r = await call('POST', '/api/admin/users', { username: 'azubi2', displayName: 'Azubi Zwei', password: 'auch-geheim', paypalMe: 'kein gültiger name' });
+    assert.equal(r.status, 400);
+    r = await call('POST', '/api/admin/users', { username: 'azubi2', displayName: 'Azubi Zwei', password: 'auch-geheim', paypalMe: 'zweikasse' });
     assert.equal(r.status, 201);
+    assert.equal(r.data.user.paypalMe, 'zweikasse');
     const menu = (await call('GET', '/api/admin/menu')).data.menu;
     const cheezy = menu.items.find((i) => i.name === 'Cheezy Tasche');
     r = await call('PUT', `/api/admin/menu/items/${cheezy.id}`, { ...cheezy, active: true });
@@ -228,6 +235,33 @@ try {
     r = await call('PUT', `/api/admin/menu/items/${cheezy.id}`, { ...cheezy, variants: [{ label: '', price: 950 }], active: true });
     assert.equal(r.status, 200);
     assert.ok(r.data.menu.items.find((i) => i.id === cheezy.id).active);
+  });
+
+  await step('PayPal-Konto kommt fest vom Zugang der Kasse', async () => {
+    const users = (await call('GET', '/api/admin/users')).data.users;
+    const id = (name) => users.find((u) => u.username === name).id;
+    let r = await call('POST', '/api/admin/rounds', { title: 'Kasse Zwei', collectorId: id('azubi2'), paypalMe: 'wird-ignoriert' });
+    assert.equal(r.status, 201, JSON.stringify(r.data));
+    assert.equal(r.data.round.paypalMe, 'zweikasse');
+    const rid = r.data.round.id;
+    r = await call('POST', '/api/public/orders', { roundId: rid, name: 'Paula', lines: [{ itemId: pizza().id, variant: 0, qty: 1 }] }, { auth: false });
+    assert.equal(r.data.order.pay.paypalMeLink, 'https://paypal.me/zweikasse/6.00EUR');
+    // Kasse wechselt → der Bezahl-Link folgt dem Zugang, ohne dass jemand PayPal neu eintippt
+    await call('PATCH', `/api/admin/rounds/${rid}`, { collectorId: id('azubi1') });
+    r = await call('GET', `/api/public/orders/${r.data.order.token}`, undefined, { auth: false });
+    assert.equal(r.data.order.pay.paypalMeLink, 'https://paypal.me/azubikasse/6.00EUR');
+    await call('PATCH', `/api/admin/rounds/${rid}`, { status: 'closed' });
+  });
+
+  await step('Kategorie-Vorsatz im Portal pflegbar', async () => {
+    const r = await call('PUT', '/api/admin/menu/categories/salat', { name: 'Salatteller', note: 'Alle Salate mit Käse und Peperoni', prefix: 'Salat' });
+    assert.equal(r.status, 200, JSON.stringify(r.data));
+    const names = Object.fromEntries(r.data.menu.items.filter((i) => i.categoryId === 'salat').map((i) => [i.name, i.displayName]));
+    assert.equal(names['Pollo Funghi'], 'Salat Pollo Funghi');
+    assert.equal(names['Gemischter Salat'], 'Gemischter Salat', 'kein doppelter Vorsatz');
+    const pizzen = r.data.menu.items.filter((i) => i.categoryId === 'pizza');
+    assert.equal(pizzen.find((i) => i.name === 'Schinken').displayName, 'Pizza Schinken');
+    assert.equal(pizzen.find((i) => i.num === 'FB').displayName, 'Familienblechpizza (40 × 60 cm)');
   });
 
   await step('Statische Seiten liefern aus', async () => {

@@ -121,7 +121,7 @@ export function openItemDialog(item, groups, initial = null) {
       <form method="dialog" class="dlg">
         <div class="dlg-head">
           <div>
-            <h2>${item.num ? `<span class="num-badge">${esc(item.num)}</span> ` : ''}${esc(item.name)}</h2>
+            <h2>${item.num ? `<span class="num-badge">${esc(item.num)}</span> ` : ''}${esc(item.displayName ?? item.name)}</h2>
             ${item.description ? `<p class="muted small">${esc(item.description)}</p>` : ''}
           </div>
           <button type="button" class="dlg-close btn-ghost" data-close aria-label="Schließen">✕</button>
@@ -204,7 +204,7 @@ export function describeSelection(item, groups, sel) {
   const p = linePreview(item, groups, sel);
   return {
     ...sel,
-    name: item.name, num: item.num, variantLabel: p.variantLabel, optionLabels: p.labels,
+    name: item.displayName ?? item.name, num: item.num, variantLabel: p.variantLabel, optionLabels: p.labels,
     unit: p.unit, total: p.unit * sel.qty,
   };
 }

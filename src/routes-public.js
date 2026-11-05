@@ -8,19 +8,24 @@ export const publicRouter = express.Router();
 
 const baseUrl = (req) => config.baseUrl || `${req.protocol}://${req.get('host')}`;
 
+// Wer die Kasse macht, bestimmt das PayPal-Konto – es ist einmal fest am Zugang hinterlegt.
+function collectorOf(round) {
+  return round?.collector_id
+    ? db.prepare('SELECT display_name, paypal_me FROM users WHERE id = ?').get(round.collector_id) : undefined;
+}
+
 function publicRound(round) {
   if (!round) return null;
-  const collector = round.collector_id
-    ? db.prepare('SELECT display_name FROM users WHERE id = ?').get(round.collector_id)?.display_name : null;
   return {
     id: round.id, title: round.title, isOpen: round.status === 'open', deadline: round.deadline,
-    pickupTime: round.pickup_time, needsCode: Boolean(round.access_code), collector,
+    pickupTime: round.pickup_time, needsCode: Boolean(round.access_code),
+    collector: collectorOf(round)?.display_name ?? null,
   };
 }
 
 function payInfo(order, round) {
   const settings = getSettings();
-  const handle = round?.paypal_me || settings.default_paypal_me;
+  const handle = collectorOf(round)?.paypal_me || settings.default_paypal_me;
   return {
     method: order.payment_method,
     canPayApi: order.payment_method === 'paypal_api' && effectiveMode() === 'api',
@@ -56,14 +61,18 @@ async function startPaypal(req, order) {
 }
 
 // sehr einfache Bremse gegen Spam-Bestellungen
+const RATE_WINDOW_MS = 10 * 60 * 1000;
 const recent = new Map();
 function rateLimited(ip) {
-  const windowMs = 10 * 60 * 1000;
-  const list = (recent.get(ip) || []).filter((t) => t > Date.now() - windowMs);
+  const list = (recent.get(ip) || []).filter((t) => t > Date.now() - RATE_WINDOW_MS);
   list.push(Date.now());
   recent.set(ip, list);
   return list.length > 15;
 }
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW_MS;
+  for (const [ip, list] of recent) if (list.every((t) => t < cutoff)) recent.delete(ip);
+}, RATE_WINDOW_MS).unref();
 
 publicRouter.get('/api/public/state', (_req, res) => {
   const settings = getSettings();
@@ -182,6 +191,8 @@ publicRouter.get('/pay/return', async (req, res) => {
   if (!order) return res.redirect('/');
   const target = `/bestellung/${encodeURIComponent(order.token)}`;
   if (order.payment_status === 'paid') return res.redirect(`${target}?bezahlt=1`);
+  // Inzwischen storniert: kein Geld mehr einziehen.
+  if (order.payment_status !== 'open') return res.redirect(target);
   const paypalId = order.paypal_order_id;
   if (!paypalId || (req.query.token && req.query.token !== paypalId)) return res.redirect(`${target}?fehler=zahlung`);
   try {

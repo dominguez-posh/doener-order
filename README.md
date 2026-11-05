@@ -21,9 +21,13 @@ Zwei Modi, umschaltbar unter *Einstellungen*:
 | Modus | Voraussetzung | Bezahlt-Status |
 |---|---|---|
 | **PayPal Checkout** | PayPal-**Business**-Konto + REST-App (Client-ID/Secret in `.env`) | automatisch, sobald gezahlt |
-| **PayPal.me** | privates PayPal-Konto, PayPal.me-Name im Profil oder an der Runde | Besteller tippt „Ich habe bezahlt“, Azubi hakt im Portal ab |
+| **PayPal.me** | privates PayPal-Konto, PayPal.me-Name einmal am Zugang hinterlegt | Besteller tippt „Ich habe bezahlt“, Azubi hakt im Portal ab |
 
 „Automatisch“ (Standard) nimmt Checkout, sobald Zugangsdaten hinterlegt sind, sonst PayPal.me.
+
+Das PayPal-Konto gehört zum **Zugang**: Jeder Azubi trägt seinen PayPal.me-Namen einmal unter *Zugänge* oder *Mein Profil*
+ein. Beim Öffnen einer Runde wird nur noch gewählt, wer die Kasse macht – der Bezahl-Link geht automatisch an das Konto
+dieser Person. Wechselt die Kasse, wechselt der Link mit.
 Hinweis: Beim Checkout berechnet PayPal Gebühren pro Zahlung. PayPal.me über „Freunde und Familie“ ist kostenlos.
 
 Checkout einrichten: auf <https://developer.paypal.com> unter *Apps & Credentials* eine REST-App anlegen, Client-ID und
@@ -41,7 +45,7 @@ npm start                 # http://localhost:3000
 ```
 
 Beim ersten Aufruf von `http://localhost:3000/admin` **direkt am Rechner** wird der erste Zugang angelegt
-(aus dem Netzwerk ist das gesperrt). Alternativ: `npm run user:add -- lena "Lena M." [passwort]`.
+(aus dem Netzwerk ist das gesperrt). Alternativ: `npm run user:add -- lena "Lena M." [passwort] [--paypal=lenam]`.
 Weitere Azubis legt man danach im Portal unter *Zugänge* an.
 
 Die Daten liegen in `data/doener.db`. Für ein Backup reicht es, diese Datei zu kopieren (bei gestopptem Server).
@@ -61,11 +65,16 @@ werden beim ersten Start übernommen. Danach wird die Karte im Portal unter *Spe
 hatten auf dem Aushang keine Preise: Sie sind inaktiv, bis jemand Preise einträgt und sie freischaltet.
 Preisänderungen betreffen nur neue Bestellungen, alte Bestellungen speichern eine Kopie ihrer Positionen.
 
+Jede Kategorie kann einen **Vorsatz** haben (*Speisekarte → Kategorie bearbeiten*). Er steht im Warenkorb, in der
+Bestellliste und auf dem Ausdruck vor dem Artikelnamen: Aus „Schinken“ wird „Pizza Schinken“, damit beim Dönermann
+niemand rätseln muss. Für die Pizzen ist „Pizza“ voreingestellt.
+
 ## Betrieb auf einem Server oder als Azure Web App
 
 - Läuft überall, wo Node.js läuft. `PORT` wird übernommen.
 - Azure Web App (Linux, Node 22+): Startbefehl `npm start`, App-Einstellungen `DATA_DIR=/home/data`, `TRUST_PROXY=true`,
   `BASE_URL=https://<app>.azurewebsites.net`, ggf. PayPal-Werte. Nur **eine** Instanz betreiben (SQLite).
+  Den ersten Zugang dort über die SSH-Konsole mit `npm run user:add` anlegen (die Einrichtung im Browser geht nur von localhost).
 - Sobald die Seite aus dem Internet erreichbar ist: HTTPS verwenden (`BASE_URL` mit `https://` setzt sichere Cookies)
   und pro Runde einen **Bestell-Code** vergeben.
 

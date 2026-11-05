@@ -29,15 +29,27 @@ export function paypalMeLink(handle, totalCents) {
 
 let tokenCache = { token: null, expires: 0 };
 
+// Fehler tragen ein `paypal`-Feld, damit der Server sie als 502 statt als internen Fehler meldet.
+const paypalError = (message, detail = {}, extra = {}) => Object.assign(new Error(message, extra), { paypal: detail });
+
+// Ein hängendes PayPal darf keine Bestellung blockieren: nach 15 s abbrechen.
+async function request(url, init) {
+  try {
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(15_000) });
+  } catch (cause) {
+    throw paypalError('PayPal ist nicht erreichbar.', {}, { cause });
+  }
+}
+
 async function accessToken() {
   if (tokenCache.token && tokenCache.expires > Date.now() + 60_000) return tokenCache.token;
   const auth = Buffer.from(`${config.paypal.clientId}:${config.paypal.clientSecret}`).toString('base64');
-  const res = await fetch(`${API_BASE()}/v1/oauth2/token`, {
+  const res = await request(`${API_BASE()}/v1/oauth2/token`, {
     method: 'POST',
     headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
     body: 'grant_type=client_credentials',
   });
-  if (!res.ok) throw new Error(`PayPal-Anmeldung fehlgeschlagen (${res.status})`);
+  if (!res.ok) throw paypalError(`PayPal-Anmeldung fehlgeschlagen (${res.status})`);
   const data = await res.json();
   tokenCache = { token: data.access_token, expires: Date.now() + data.expires_in * 1000 };
   return tokenCache.token;
@@ -46,15 +58,9 @@ async function accessToken() {
 async function call(method, path, body, requestId) {
   const headers = { Authorization: `Bearer ${await accessToken()}`, 'Content-Type': 'application/json' };
   if (requestId) headers['PayPal-Request-Id'] = requestId;
-  const res = await fetch(`${API_BASE()}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const res = await request(`${API_BASE()}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const issue = data?.details?.[0]?.issue || data?.name || res.status;
-    const err = new Error(`PayPal-Fehler: ${issue}`);
-    err.paypal = data;
-    err.status = res.status;
-    throw err;
-  }
+  if (!res.ok) throw paypalError(`PayPal-Fehler: ${data?.details?.[0]?.issue || data?.name || res.status}`, data);
   return data;
 }
 

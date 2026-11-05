@@ -119,6 +119,8 @@ function setupView() {
     <p class="muted small">Es gibt noch keine Zugänge. Dieser erste Zugang kann weitere Azubis anlegen.</p>
     <label for="su-user">Benutzername</label><input id="su-user" name="username" type="text" autocomplete="username" required>
     <label for="su-name">Anzeigename</label><input id="su-name" name="displayName" type="text" required>
+    <label for="su-pp">PayPal.me-Name (optional)</label><input id="su-pp" name="paypalMe" type="text" maxlength="64" placeholder="z. B. maxmuster">
+    <p class="hint">Der Name hinter paypal.me/ – gilt für jede Runde, in der du die Kasse machst.</p>
     <label for="su-pw">Passwort (min. 8 Zeichen)</label><input id="su-pw" name="password" type="password" autocomplete="new-password" required>
     <p class="error-text" data-error role="alert"></p>
     <button class="btn-primary btn-block" type="submit">Anlegen und anmelden</button>
@@ -127,7 +129,7 @@ function setupView() {
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     try {
-      await api('/api/auth/setup', { method: 'POST', body: { username: form.username.value, displayName: form.displayName.value, password: form.password.value } });
+      await api('/api/auth/setup', { method: 'POST', body: { username: form.username.value, displayName: form.displayName.value, paypalMe: form.paypalMe.value, password: form.password.value } });
       boot();
     } catch (err) {
       $('[data-error]', form).textContent = err.message;
@@ -164,6 +166,7 @@ function view() { return $('[data-view]'); }
 async function route() {
   clearInterval(refreshTimer);
   closePopups();
+  $$('dialog[open]').forEach((d) => d.close());
   current = null;
   const v = view();
   v.onclick = v.onchange = v.onkeydown = null;
@@ -204,10 +207,9 @@ async function currentView() {
 }
 
 async function roundDialog(round = null) {
-  const users = await getUsers();
+  const [users, { settings }] = await Promise.all([getUsers(true), api('/api/admin/settings')]);
   const activeUsers = users.filter((u) => u.active || u.id === round?.collectorId);
   const collectorId = round?.collectorId ?? me.id;
-  const defaultHandle = round ? round.paypalMe : users.find((u) => u.id === collectorId)?.paypalMe;
   const { form } = modal({
     title: round ? 'Runde bearbeiten' : 'Neue Bestellrunde öffnen',
     body: `
@@ -222,10 +224,8 @@ async function roundDialog(round = null) {
       </div>
       <div class="field-row">
         <div><label for="r-collector">Kasse (wer sammelt das Geld ein)</label>
-          <select id="r-collector" name="collectorId">${activeUsers.map((u) => `<option value="${u.id}" ${u.id === collectorId ? 'selected' : ''}>${esc(u.displayName)}</option>`).join('')}</select></div>
-        <div><label for="r-pp">PayPal.me-Name für diese Runde</label>
-          <input id="r-pp" name="paypalMe" type="text" maxlength="64" placeholder="z. B. maxmuster" value="${esc(defaultHandle ?? '')}">
-          <p class="hint">Nur für den PayPal.me-Modus. Wird beim Wechsel der Kasse aus deren Profil übernommen.</p></div>
+          <select id="r-collector" name="collectorId">${activeUsers.map((u) => `<option value="${u.id}" ${u.id === collectorId ? 'selected' : ''}>${esc(u.displayName)}</option>`).join('')}</select>
+          <p class="hint" data-pp-info></p></div>
       </div>
       <label for="r-code">Bestell-Code (optional)</label>
       <input id="r-code" name="accessCode" type="text" maxlength="32" placeholder="leer = jeder mit dem Link kann bestellen" value="${esc(round?.accessCode ?? '')}">
@@ -234,7 +234,7 @@ async function roundDialog(round = null) {
     onSubmit: async (f) => {
       const body = {
         title: f.title.value, deadline: fromLocalInput(f.deadline.value), pickupTime: f.pickupTime.value,
-        collectorId: Number(f.collectorId.value), paypalMe: f.paypalMe.value, accessCode: f.accessCode.value,
+        collectorId: Number(f.collectorId.value), accessCode: f.accessCode.value,
       };
       const res = round
         ? await api(`/api/admin/rounds/${round.id}`, { method: 'PATCH', body })
@@ -245,10 +245,18 @@ async function roundDialog(round = null) {
       else location.hash = '#/';
     },
   });
-  form.collectorId.addEventListener('change', () => {
+  const paypalInfo = () => {
     const u = users.find((x) => x.id === Number(form.collectorId.value));
-    form.paypalMe.value = u?.paypalMe ?? '';
-  });
+    const who = esc(u?.displayName ?? 'diese Person');
+    let text;
+    if (settings.effectiveMode === 'api') text = 'Bezahlt wird über PayPal Checkout, der Eingang wird automatisch verbucht.';
+    else if (u?.paypalMe) text = `Zahlungen gehen an <strong>paypal.me/${esc(u.paypalMe)}</strong> – fest im Zugang von ${who} hinterlegt.`;
+    else if (settings.defaultPaypalMe) text = `Für ${who} ist kein PayPal hinterlegt. Es gilt der Standard <strong>paypal.me/${esc(settings.defaultPaypalMe)}</strong> aus den Einstellungen.`;
+    else text = `<strong>Für ${who} ist noch kein PayPal hinterlegt.</strong> Bitte einmal unter <a href="#/zugaenge">Zugänge</a> eintragen, sonst gibt es keinen Bezahl-Link.`;
+    $('[data-pp-info]', form).innerHTML = text;
+  };
+  form.collectorId.addEventListener('change', paypalInfo);
+  paypalInfo();
 }
 
 // ---------------- Runden-Detail ----------------
@@ -258,9 +266,15 @@ async function roundView(id) {
   lastRoundId = id;
   showRound(detail);
   refreshTimer = setInterval(async () => {
-    if ($('dialog[open]') || $('.menu-pop-list') || document.activeElement?.matches('textarea, input')) return;
-    if (current?.round.status !== 'open') return;
-    try { showRound(await api(`/api/admin/rounds/${id}`)); } catch { /* nächster Versuch */ }
+    // Nicht neu zeichnen, solange jemand tippt, ein Dialog/Menü offen ist oder ungespeicherte Notizen im Feld stehen
+    if ($('dialog[open]') || $('.menu-pop-list') || roundTab === 'notes') return;
+    if (document.activeElement?.matches('textarea, input:not([type=checkbox])')) return;
+    const before = current;
+    if (before?.round.status !== 'open') return;
+    try {
+      const next = await api(`/api/admin/rounds/${id}`);
+      if (current === before && JSON.stringify(next) !== JSON.stringify(before)) showRound(next);
+    } catch { /* nächster Versuch */ }
   }, 15000);
 }
 
@@ -618,9 +632,9 @@ async function orderEditor(order) {
 
   const renderPicker = (q = '') => {
     const ql = q.toLowerCase();
-    const list = menu.items.filter((i) => !ql || `${i.num ?? ''} ${i.name}`.toLowerCase().includes(ql)).slice(0, 80);
+    const list = menu.items.filter((i) => !ql || `${i.num ?? ''} ${i.displayName}`.toLowerCase().includes(ql)).slice(0, 80);
     $('[data-picker]', dlg).innerHTML = list.map((i) => `<button type="button" data-pick="${i.id}" ${i.variants.every((v) => v.price === null) ? 'disabled' : ''}>
-      ${i.num ? `<span class="num-badge">${esc(i.num)}</span>` : ''}<span>${esc(i.name)}${i.active ? '' : ' <span class="pill pill-muted">inaktiv</span>'}</span>
+      ${i.num ? `<span class="num-badge">${esc(i.num)}</span>` : ''}<span>${esc(i.displayName)}${i.active ? '' : ' <span class="pill pill-muted">inaktiv</span>'}</span>
       <span class="price">${priceFrom(i)}</span></button>`).join('') || '<p class="empty">Nichts gefunden</p>';
   };
   const renderLines = () => {
@@ -717,7 +731,8 @@ async function menuView() {
     <p class="muted small">Preisänderungen gelten nur für neue Bestellungen – alte Bestellungen behalten ihre Preise.</p>
     ${menu.categories.map((c) => {
       const items = menu.items.filter((i) => i.categoryId === c.id);
-      return `<section class="menu-admin-cat"><h2>${esc(c.name)} <span class="muted small">${items.length}</span></h2>
+      return `<section class="menu-admin-cat"><h2>${esc(c.name)} <span class="muted small">${items.length} Artikel${c.prefix ? ` · in Bestellungen als „${esc(c.prefix)} …“` : ''}</span>
+        <button type="button" class="btn-ghost btn-sm" data-cat-edit="${esc(c.id)}">Kategorie bearbeiten</button></h2>
       <div class="table-wrap"><table class="data">
         <thead><tr><th>Nr.</th><th>Artikel</th><th>Preise</th><th>Optionen</th><th>Bestellbar</th><th></th></tr></thead>
         <tbody>${items.map((i) => `<tr>
@@ -745,6 +760,7 @@ async function menuView() {
     if (b.matches('[data-item-new]')) itemEditor(menu, null);
     if (b.dataset.itemEdit) itemEditor(menu, menu.items.find((i) => i.id === Number(b.dataset.itemEdit)));
     if (b.dataset.groupEdit) groupEditor(menu.groups[b.dataset.groupEdit]);
+    if (b.dataset.catEdit) categoryEditor(menu.categories.find((c) => c.id === b.dataset.catEdit));
   };
   view().onchange = async (e) => {
     const id = e.target.dataset.itemActive;
@@ -840,6 +856,24 @@ function readRowsLoose(root) {
   });
 }
 
+function categoryEditor(cat) {
+  modal({
+    title: `Kategorie „${esc(cat.name)}“`,
+    body: `
+      <label for="ct-name">Name</label><input id="ct-name" name="catName" type="text" maxlength="60" value="${esc(cat.name)}">
+      <label for="ct-note">Hinweis unter der Überschrift</label><input id="ct-note" name="note" type="text" maxlength="200" value="${esc(cat.note ?? '')}">
+      <label for="ct-prefix">Vorsatz in Bestellungen</label><input id="ct-prefix" name="prefix" type="text" maxlength="30" placeholder="z. B. Pizza" value="${esc(cat.prefix ?? '')}">
+      <p class="hint">Steht im Warenkorb, in der Bestellliste und auf dem Ausdruck vor dem Artikelnamen – so wird aus „Schinken“ eine „Pizza Schinken“. Namen, die das Wort schon enthalten, bleiben unverändert.</p>`,
+    onSubmit: async (f) => {
+      menuCache = (await api(`/api/admin/menu/categories/${encodeURIComponent(cat.id)}`, {
+        method: 'PUT', body: { name: f.catName.value, note: f.note.value, prefix: f.prefix.value },
+      })).menu;
+      toast('Gespeichert');
+      menuView();
+    },
+  });
+}
+
 function groupEditor(group) {
   let choices = group.choices.map((c) => ({ ...c }));
   const { dlg } = modal({
@@ -877,13 +911,13 @@ function groupEditor(group) {
 async function usersView() {
   const users = await getUsers(true);
   view().innerHTML = `
-    <div class="page-head"><div><h1>Zugänge</h1><div class="meta">Jeder Azubi bekommt einen eigenen Login. Alle Zugänge haben die gleichen Rechte.</div></div>
+    <div class="page-head"><div><h1>Zugänge</h1><div class="meta">Jeder Azubi bekommt einen eigenen Login. Das PayPal-Konto wird hier einmal hinterlegt und gilt dann für jede Runde, in der die Person die Kasse macht.</div></div>
       <div class="btn-row"><button type="button" class="btn-primary" data-user-new>+ Zugang anlegen</button></div></div>
     <div class="table-wrap"><table class="data">
       <thead><tr><th>Name</th><th>Benutzername</th><th>PayPal.me</th><th>Status</th><th>Angelegt</th><th></th></tr></thead>
       <tbody>${users.map((u) => `<tr>
         <td><strong>${esc(u.displayName)}</strong>${u.id === me.id ? ' <span class="pill pill-muted">du</span>' : ''}</td>
-        <td>${esc(u.username)}</td><td>${u.paypalMe ? esc(u.paypalMe) : '<span class="muted">–</span>'}</td>
+        <td>${esc(u.username)}</td><td>${u.paypalMe ? `paypal.me/${esc(u.paypalMe)}` : u.active ? '<span class="pill pill-warn">fehlt</span>' : '<span class="muted">–</span>'}</td>
         <td>${u.active ? '<span class="pill pill-ok">aktiv</span>' : '<span class="pill pill-muted">deaktiviert</span>'}</td>
         <td class="small">${when(u.createdAt, { dateStyle: 'medium' })}</td>
         <td><button type="button" class="btn-sm" data-user-edit="${u.id}">Bearbeiten</button></td></tr>`).join('')}</tbody>
@@ -903,7 +937,7 @@ function userDialog(user) {
       ${user ? '' : '<label for="u-user">Benutzername</label><input id="u-user" name="username" type="text" maxlength="32" autocomplete="off" required>'}
       <label for="u-name">Anzeigename</label><input id="u-name" name="displayName" type="text" maxlength="60" value="${esc(user?.displayName ?? '')}">
       <label for="u-pp">PayPal.me-Name</label><input id="u-pp" name="paypalMe" type="text" maxlength="64" placeholder="z. B. maxmuster" value="${esc(user?.paypalMe ?? '')}">
-      <p class="hint">Wird vorgeschlagen, wenn diese Person bei einer Runde die Kasse übernimmt.</p>
+      <p class="hint">Nur der Name hinter paypal.me/. Einmal eintragen – gilt automatisch für jede Runde, in der diese Person die Kasse macht.</p>
       <label for="u-pw">${user ? 'Neues Passwort (leer lassen = unverändert)' : 'Passwort (min. 8 Zeichen)'}</label>
       <input id="u-pw" name="password" type="password" autocomplete="new-password">
       ${user && user.id !== me.id ? `<label class="inline"><input type="checkbox" name="active" ${user.active ? 'checked' : ''}> Zugang aktiv</label>` : ''}`,
@@ -937,7 +971,7 @@ async function settingsView() {
       <p class="hint">PayPal-API: ${s.apiConfigured ? `<span class="pill pill-ok">eingerichtet (${esc(s.paypalEnv)})</span>` : '<span class="pill pill-muted">nicht eingerichtet</span> – Zugangsdaten in der Datei <code>.env</code> eintragen (siehe README)'}
         · Aktiv ist gerade: <strong>${s.effectiveMode === 'api' ? 'PayPal Checkout' : 'PayPal.me'}</strong></p>
       <label for="s-pp">Standard-PayPal.me-Name</label><input id="s-pp" name="defaultPaypalMe" type="text" maxlength="64" value="${esc(s.defaultPaypalMe)}">
-      <p class="hint">Wird genommen, wenn bei der Runde kein eigener PayPal.me-Name hinterlegt ist.</p>
+      <p class="hint">Wird nur genommen, wenn beim Zugang der Kasse kein PayPal hinterlegt ist.</p>
       <label for="s-tip">Trinkgeld-Vorschläge (Euro, mit Komma getrennt)</label><input id="s-tip" name="tipPresets" type="text">
       <p class="hint">z. B. 0.5; 1; 2 – maximal 5 Vorschläge.</p>
       <p class="error-text" data-error></p>
@@ -973,7 +1007,7 @@ async function profileView() {
         <h2>Angaben</h2>
         <label for="p-name">Anzeigename</label><input id="p-name" name="displayName" type="text" maxlength="60" value="${esc(user.displayName)}">
         <label for="p-pp">Mein PayPal.me-Name</label><input id="p-pp" name="paypalMe" type="text" maxlength="64" placeholder="z. B. maxmuster" value="${esc(user.paypalMe ?? '')}">
-        <p class="hint">Nur der Name hinter paypal.me/ – wird für Runden vorgeschlagen, in denen du die Kasse machst.</p>
+        <p class="hint">Nur der Name hinter paypal.me/ – gilt automatisch für jede Runde, in der du die Kasse machst.</p>
         <button type="submit" class="btn-primary">Speichern</button>
       </form>
       <form class="card" data-password>

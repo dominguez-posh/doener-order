@@ -80,6 +80,7 @@ export function requireUser(req, res, next) {
 
 export function purgeExpiredSessions() {
   db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
+  for (const [key, f] of failures) if (f.until < Date.now()) failures.delete(key);
 }
 
 // ---- einfacher Schutz gegen Passwort-Raten ----

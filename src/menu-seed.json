@@ -60,7 +60,7 @@
       ]
     },
     {
-      "id": "pizza", "name": "Steinofen-Pizza", "note": "Alle Pizzen mit Tomatensauce, Goudakäse und Oregano. Extra Belag +1,00 €",
+      "id": "pizza", "name": "Steinofen-Pizza", "prefix": "Pizza", "note": "Alle Pizzen mit Tomatensauce, Goudakäse und Oregano. Extra Belag +1,00 €",
       "items": [
         { "num": "15", "name": "Margherita", "v": [["24 cm", 6.00], ["30 cm", 7.50]], "g": ["pizzabelag"] },
         { "num": "16", "name": "Cipolla", "desc": "mit Zwiebeln", "v": [["24 cm", 6.50], ["30 cm", 8.00]], "g": ["pizzabelag"] },
